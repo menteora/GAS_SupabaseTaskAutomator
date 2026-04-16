@@ -13,6 +13,10 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | File | Responsabilità |
 |---|---|
 | `Supabase.js` | Tutte le funzioni pubbliche: config, reminder, log, trigger registry |
+| `sync-supabase-lib.sh` | Script di sync: distribuisce file e secrets ai progetti target |
+| `secrets/global.env` | *(non versionato)* Valori reali di URL e chiavi Supabase |
+| `secrets/global.env.example` | Template documentato per `global.env` |
+| `secrets/<PROGETTO>.env` | Config per-progetto: SCRIPT_ID, COPY_FILES, mapping Script Properties |
 | `ddl_reminders.sql` | Schema attuale completo della tabella `reminders` |
 | `ddl_logs.sql` | Schema attuale completo della tabella `logs` |
 | `ddl_triggers.sql` | Schema attuale completo della tabella `triggers` |
@@ -231,3 +235,66 @@ le funzioni sono disponibili direttamente nel namespace globale.
 | `SUPABASE_URL` | Sì | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Sì | Service role key |
 | `LOG_LEVEL` | Auto-creata | `debug`\|`info`\|`warn`\|`error` |
+
+Le Script Properties vengono impostate automaticamente tramite `secrets.gs` (vedi sezione successiva).
+
+---
+
+## Gestione secrets e sync con sync-supabase-lib.sh
+
+### Avvio
+
+```bash
+./sync-supabase-lib.sh          # menu interattivo
+./sync-supabase-lib.sh --apply  # retrocompatibilità: copia file senza menu
+./sync-supabase-lib.sh --push   # retrocompatibilità: copia + clasp push
+```
+
+### Menu
+
+| Opzione | Azione |
+|---|---|
+| 1 | Dry-run: mostra differenze senza modificare nulla |
+| 2 | Copia i file configurati (es. `Supabase.js`) nei progetti target |
+| 3 | Copia file + `clasp push` su ogni progetto |
+| 4 | Genera `secrets.gs` nei progetti target |
+| 5 | Tutto: genera secrets + copia file + clasp push |
+| 6 | Pull totale: `clasp pull` (o `clasp clone` se la cartella non esiste) |
+| 7 | Git commit & push per tutti i progetti |
+
+### Aggiungere un nuovo progetto
+
+1. Creare `secrets/<NOME_CARTELLA>.env` (stesso nome della cartella in `/workspace/`):
+
+```bash
+SCRIPT_ID=<ID_SCRIPT_GAS>
+COPY_FILES=Supabase.js
+
+# Formato 1 — riferimento a global.env (per valori segreti):
+#   NOME_PROPERTY=NOME_VARIABILE_IN_GLOBAL_ENV
+SUPABASE_URL=BANCOLINI_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=BANCOLINI_SUPABASE_KEY
+
+# Formato 2 — valore letterale diretto (per config non segrete, versionabili):
+#   NOME_PROPERTY=valore_diretto
+REMINDER_SHEET_ID=1BxiMVBxxx...
+LOG_SHEET_NAME=Logs
+```
+
+Se il valore non corrisponde a nessuna variabile definita in `global.env`, viene usato letteralmente così com'è.
+
+2. Aggiungere eventuali variabili custom in `secrets/global.env`
+3. Il file `.env` del progetto è versionato (non contiene valori segreti)
+
+### Setup ambiente da zero (nuovo clone del repo)
+
+1. Copiare `secrets/global.env.example` → `secrets/global.env` e compilare i valori reali
+2. Lanciare `./sync-supabase-lib.sh` → opzione **6** (Pull totale) per clonare tutti i progetti
+3. Lanciare opzione **4** per generare i `secrets.gs` in ogni progetto
+4. Aprire l'editor GAS di ogni progetto ed eseguire `initScriptProperties_()` una sola volta
+
+### Sicurezza
+
+- `secrets/global.env` è l'unico file con valori segreti reali — è in `.gitignore`
+- I file `secrets/<PROGETTO>.env` contengono solo nomi di variabili (nessun segreto) — sono versionati
+- `secrets.gs` nei progetti target non è versionato (aggiunto automaticamente al `.gitignore` del progetto)
