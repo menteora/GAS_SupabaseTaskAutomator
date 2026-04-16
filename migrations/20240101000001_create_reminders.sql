@@ -1,17 +1,7 @@
--- ============================================================
---  SCHEMA ATTUALE — tabella reminders
---
---  Questo file rispecchia lo stato corrente della tabella.
---  Tenerlo allineato ad ogni modifica (vedi migrations/ per lo storico).
---
---  Per un nuovo ambiente: eseguire le migration in ordine oppure
---  eseguire questo file direttamente nel SQL Editor di Supabase.
---
---  Flusso:
---    INSERT (status='pending', scheduled_at=<quando inviare>)
---    → GAS legge i pending con scheduled_at <= now()
---    → GAS invia e fa PATCH status='sent' | 'error'
--- ============================================================
+-- Migration: create_reminders
+-- Crea la tabella reminders per archiviare i reminder in attesa di invio.
+-- Flusso: INSERT (status='pending') → GAS legge pending con scheduled_at <= now()
+--         → GAS invia e fa PATCH status='sent' | 'error'
 
 CREATE TABLE IF NOT EXISTS public.reminders (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,33 +42,3 @@ CREATE INDEX IF NOT EXISTS idx_reminders_status
 
 -- RLS (abilita ma lascia accesso al service_role)
 ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
-
--- ============================================================
---  QUERY DI UTILITÀ
--- ============================================================
-
--- Reminder in attesa (equivalente a supFetchPendingReminders):
-/*
-SELECT id, scheduled_at, channel, channel_config, notes
-FROM public.reminders
-WHERE status = 'pending'
-  AND scheduled_at <= now()
-ORDER BY scheduled_at ASC;
-*/
-
--- Statistiche per status:
-/*
-SELECT status, count(*) AS n
-FROM public.reminders
-GROUP BY status
-ORDER BY status;
-*/
-
--- Ultimi errori:
-/*
-SELECT id, scheduled_at, channel_config->>'to' AS recipient, error_log, created_at
-FROM public.reminders
-WHERE status = 'error'
-ORDER BY created_at DESC
-LIMIT 20;
-*/

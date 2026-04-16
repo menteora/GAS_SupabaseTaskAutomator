@@ -1,9 +1,11 @@
 -- ============================================================
---  DDL — tabella logs
+--  SCHEMA ATTUALE — tabella logs
 --
---  Eseguire UNA SOLA VOLTA nel SQL Editor di Supabase.
---  Raccoglie i log di esecuzione prodotti da supFlushLogs().
---  I log vengono scritti in batch al termine di ogni run GAS.
+--  Questo file rispecchia lo stato corrente della tabella.
+--  Tenerlo allineato ad ogni modifica (vedi migrations/ per lo storico).
+--
+--  Per un nuovo ambiente: eseguire le migration in ordine oppure
+--  eseguire questo file direttamente nel SQL Editor di Supabase.
 --
 --  Pattern di utilizzo:
 --    supBufferLog(buffer, runId, configuredLevel, level, msg, ctx)

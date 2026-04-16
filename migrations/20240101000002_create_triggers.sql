@@ -1,16 +1,7 @@
--- ============================================================
---  SCHEMA ATTUALE — tabella triggers
---
---  Questo file rispecchia lo stato corrente della tabella.
---  Tenerlo allineato ad ogni modifica (vedi migrations/ per lo storico).
---
---  Per un nuovo ambiente: eseguire le migration in ordine oppure
---  eseguire questo file direttamente nel SQL Editor di Supabase.
---
---  Registra i trigger attivi nei vari progetti GAS (o altri
---  runtime futuri) e permette di rilevare trigger "silenziosi"
---  confrontando: last_run_at + (interval_value * interval_unit) < now()
--- ============================================================
+-- Migration: create_triggers
+-- Crea la tabella triggers per il registro centralizzato dei trigger GAS.
+-- Permette di rilevare trigger "silenziosi" confrontando:
+--   last_run_at + (interval_value * interval_unit) < now()
 
 CREATE TABLE IF NOT EXISTS public.triggers (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -76,35 +67,3 @@ CREATE INDEX IF NOT EXISTS idx_triggers_last_run
 
 -- RLS (abilita ma lascia accesso al service_role)
 ALTER TABLE public.triggers ENABLE ROW LEVEL SECURITY;
-
--- ============================================================
---  QUERY DI CONTROLLO — trigger "silenziosi"
---
---  Rileva i trigger time_based che non sono partiti nei tempi
---  attesi: last_run_at + intervallo < now()
---
---  Logica: se last_run_at + intervallo è nel passato significa
---  che il trigger doveva già essere scattato ma non lo ha fatto.
--- ============================================================
-
--- Esempio di query da eseguire per il monitoraggio:
-/*
-SELECT
-  project_name,
-  trigger_name,
-  trigger_type,
-  interval_value,
-  interval_unit,
-  last_run_at,
-  -- calcola il prossimo run atteso
-  last_run_at + (interval_value || ' ' || interval_unit)::INTERVAL AS next_expected_run,
-  -- se next_expected_run < now() → trigger silenzioso
-  CASE
-    WHEN last_run_at IS NULL THEN 'mai_eseguito'
-    WHEN last_run_at + (interval_value || ' ' || interval_unit)::INTERVAL < now() THEN 'SILENZIOSO'
-    ELSE 'ok'
-  END AS stato
-FROM public.triggers
-WHERE trigger_type = 'time_based'
-ORDER BY project_name, trigger_name;
-*/

@@ -13,9 +13,10 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | File | Responsabilità |
 |---|---|
 | `Supabase.js` | Tutte le funzioni pubbliche: config, reminder, log, trigger registry |
-| `ddl_reminders.sql` | DDL della tabella `reminders` (eseguire una volta in Supabase) |
-| `ddl_logs.sql` | DDL della tabella `logs` (eseguire una volta in Supabase) |
-| `ddl_triggers.sql` | DDL della tabella `triggers` (eseguire una volta in Supabase) |
+| `ddl_reminders.sql` | Schema attuale completo della tabella `reminders` |
+| `ddl_logs.sql` | Schema attuale completo della tabella `logs` |
+| `ddl_triggers.sql` | Schema attuale completo della tabella `triggers` |
+| `migrations/` | Storico delle modifiche DB in ordine cronologico (formato Supabase CLI) |
 | `appsscript.json` | Manifest GAS |
 
 ---
@@ -127,12 +128,63 @@ supUnregisterTrigger(cfg, 'nomeHandlerFunction', 'NOME_PROGETTO_GAS');
 
 ---
 
+## Gestione delle modifiche al database
+
+### Regola fondamentale
+
+**Ogni modifica allo schema DB richiede due aggiornamenti contestuali:**
+
+1. **Nuova migration** in `migrations/` con nome `YYYYMMDDHHMMSS_descrizione.sql`
+2. **Aggiornamento** del file `ddl_*.sql` corrispondente nella root per riflettere lo stato attuale
+
+### Formato migration (compatibile con Supabase CLI + GitHub integration)
+
+```
+migrations/
+  20240101000000_create_logs.sql
+  20240101000001_create_reminders.sql
+  20240101000002_create_triggers.sql
+  YYYYMMDDHHMMSS_<cosa_fa>.sql   ← nuova migration
+```
+
+Il timestamp è `YYYYMMDDHHMMSS` (14 cifre, UTC). La descrizione usa `_` come separatore, in minuscolo.
+
+### Contenuto di una migration
+
+```sql
+-- Migration: <descrizione>
+-- Breve spiegazione della modifica e del perché.
+
+-- Solo le istruzioni ALTER/CREATE/DROP incrementali
+-- (non l'intero DDL della tabella)
+
+ALTER TABLE public.<tabella> ADD COLUMN ...;
+CREATE INDEX IF NOT EXISTS ...;
+```
+
+### Aggiornamento del DDL nella root
+
+Dopo aver creato la migration, aggiornare il file `ddl_<tabella>.sql` nella root
+in modo che rispecchi lo schema completo e attuale (come se si ricreasse da zero).
+I file DDL nella root sono la "verità corrente" — le migration sono lo storico.
+
+### Esempi di descrizioni
+
+| Modifica | Nome migration |
+|---|---|
+| Aggiunta colonna `retry_count` a `reminders` | `20260416120000_reminders_add_retry_count.sql` |
+| Nuovo indice su `logs.executor_name` | `20260416130000_logs_add_index_executor.sql` |
+| Nuova tabella `schedules` | `20260416140000_create_schedules.sql` |
+| Rinomina colonna `notes` → `description` | `20260416150000_reminders_rename_notes_to_description.sql` |
+
+---
+
 ## Tabelle Supabase gestite
 
-### `reminders` — DDL: `ddl_reminders.sql`
-### `logs` — DDL: `ddl_logs.sql`
+### `reminders` — schema attuale: `ddl_reminders.sql` — storia: `migrations/`
+### `logs` — schema attuale: `ddl_logs.sql` — storia: `migrations/`
 
-### `triggers` — DDL: `ddl_triggers.sql`
+### `triggers` — schema attuale: `ddl_triggers.sql` — storia: `migrations/`
 
 ```
 id             UUID PRIMARY KEY DEFAULT gen_random_uuid()
