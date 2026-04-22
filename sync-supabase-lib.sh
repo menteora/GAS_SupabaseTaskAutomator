@@ -92,6 +92,7 @@ fn_copy_files() {
     fi
 
     # Itera i file da copiare (separati da virgola)
+    local project_changed=0
     IFS=',' read -ra files <<< "$copy_files_raw"
     for rel_file in "${files[@]}"; do
       rel_file="${rel_file// /}"   # trim spazi
@@ -122,20 +123,21 @@ fn_copy_files() {
 
       echo "  [COPY]  $project/$rel_file — $status"
       ((changed++)) || true
+      ((project_changed++)) || true
 
       if [[ "$mode" != "dry" ]]; then
         cp "$src" "$dest"
-
-        if [[ "$mode" == "push" ]]; then
-          if [[ -f "$project_dir/.clasp.json" ]]; then
-            echo "          → clasp push ($project)..."
-            (cd "$project_dir" && clasp push --force 2>&1 | sed 's/^/             /')
-          else
-            echo "          → clasp push saltato: .clasp.json non trovato"
-          fi
-        fi
       fi
     done
+
+    if [[ "$mode" == "push" && $project_changed -gt 0 ]]; then
+      if [[ -f "$project_dir/.clasp.json" ]]; then
+        echo "          → clasp push ($project)..."
+        (cd "$project_dir" && clasp push --force 2>&1 | sed 's/^/             /')
+      else
+        echo "          → clasp push saltato: .clasp.json non trovato"
+      fi
+    fi
   done < <(fn_list_project_envs)
 
   echo ""

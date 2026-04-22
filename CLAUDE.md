@@ -3,31 +3,41 @@
 ## Scopo
 
 Libreria condivisa Google Apps Script per l'interfacciamento con Supabase.
-Centralizza connessione, reminder, log e registro trigger.
-Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
+Centralizza connessione, reminder, log, registro trigger, dispatch email e gestione trigger GAS.
+I file `STA*.js` vengono distribuiti ai progetti consumer tramite `sync-supabase-lib.sh`.
+
+---
+
+## Convenzione nomi
+
+Il prefisso **`STA`** (**S**upabase**T**ask**A**utomator) identifica tutti i file e le funzioni della libreria.
+Le funzioni in `STASupabase.js` usano il prefisso `sup*` per retrocompatibilità.
+Le funzioni in `STAReminder.js` e `STATriggers.js` usano il prefisso `sta*`.
 
 ---
 
 ## Struttura file
 
-| File | Responsabilità |
-|---|---|
-| `Supabase.js` | Tutte le funzioni pubbliche: config, reminder, log, trigger registry |
-| `sync-supabase-lib.sh` | Script di sync: distribuisce file e secrets ai progetti target |
-| `secrets/global.env` | *(non versionato)* Valori reali di URL e chiavi Supabase |
-| `secrets/global.env.example` | Template documentato per `global.env` |
-| `secrets/<PROGETTO>.env` | Config per-progetto: SCRIPT_ID, COPY_FILES, mapping Script Properties |
-| `ddl_reminders.sql` | Schema attuale completo della tabella `reminders` |
-| `ddl_logs.sql` | Schema attuale completo della tabella `logs` |
-| `ddl_triggers.sql` | Schema attuale completo della tabella `triggers` |
-| `migrations/` | Storico delle modifiche DB in ordine cronologico (formato Supabase CLI) |
-| `appsscript.json` | Manifest GAS |
+| File | Prefisso funzioni | Responsabilità |
+|---|---|---|
+| `STASupabase.js` | `sup*` | Connessione HTTP, reminder CRUD, log, trigger registry Supabase |
+| `STAReminder.js` | `sta*` | Dispatch email per canale, invio Gmail |
+| `STATriggers.js` | `sta*` | Installazione/rimozione trigger GAS, sincronizzazione con registro Supabase |
+| `sync-supabase-lib.sh` | — | Script di sync: distribuisce file e secrets ai progetti target |
+| `secrets/global.env` | — | *(non versionato)* Valori reali di URL e chiavi Supabase |
+| `secrets/global.env.example` | — | Template documentato per `global.env` |
+| `secrets/<PROGETTO>.env` | — | Config per-progetto: SCRIPT_ID, COPY_FILES, mapping Script Properties |
+| `ddl_reminders.sql` | — | Schema attuale completo della tabella `reminders` |
+| `ddl_logs.sql` | — | Schema attuale completo della tabella `logs` |
+| `ddl_triggers.sql` | — | Schema attuale completo della tabella `triggers` |
+| `migrations/` | — | Storico delle modifiche DB in ordine cronologico (formato Supabase CLI) |
+| `appsscript.json` | — | Manifest GAS |
 
 ---
 
 ## Funzioni esposte
 
-### Connessione
+### STASupabase.js — Connessione
 | Funzione | Descrizione |
 |---|---|
 | `supGetConfig()` | Legge SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY dalle Script Properties |
@@ -35,7 +45,7 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | `supAssertOk(res, context)` | Lancia errore se la risposta HTTP non è 2xx |
 | `supSetupVerify()` | Verifica connettività e tabelle (eseguire manualmente) |
 
-### Reminder (tabella `reminders`)
+### STASupabase.js — Reminder (tabella `reminders`)
 | Funzione | Descrizione |
 |---|---|
 | `supInsertReminder(cfg, htmlBody, recipient, subject, notes?, scheduledAt?, cc?, bcc?)` | Insert reminder (cc e bcc opzionali) |
@@ -43,7 +53,7 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | `supMarkReminderSent(cfg, id)` | Imposta status='sent' |
 | `supMarkReminderError(cfg, id, errMsg)` | Imposta status='error' |
 
-### Log (tabella `logs`)
+### STASupabase.js — Log (tabella `logs`)
 | Funzione | Descrizione |
 |---|---|
 | `supGenerateUUID()` | UUID v4 pseudo-casuale |
@@ -52,7 +62,7 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | `supBufferLog(buffer, runId, configuredLevel, level, message, context)` | Aggiunge al buffer in-memory |
 | `supFlushLogs(cfg, rows, runner)` | Batch insert su `logs`; non lancia mai eccezioni |
 
-### Trigger Registry (tabella `triggers`)
+### STASupabase.js — Trigger Registry (tabella `triggers`)
 | Funzione | Descrizione |
 |---|---|
 | `supRegisterTrigger(cfg, opts)` | UPSERT trigger nel registro |
@@ -60,12 +70,28 @@ Va aggiunta come **Library** GAS ai progetti che la usano (tramite script ID).
 | `supUnregisterTrigger(cfg, triggerName, projectName)` | Rimuove trigger dal registro |
 | `supGetRegisteredTriggers(cfg, projectName?)` | Legge il registro (opz. filtro per progetto) |
 
-### Costanti
+### STASupabase.js — Costanti
 | Costante | Valori |
 |---|---|
 | `SUP_TRIGGER_PLATFORM` | `GOOGLE_APPS_SCRIPT = 'google_apps_script'` |
 | `SUP_TRIGGER_TYPE` | `TIME_BASED`, `ON_EDIT`, `ON_FORM_SUBMIT`, `ON_OPEN`, `ON_CHANGE` |
 | `SUP_TRIGGER_INTERVAL_UNIT` | `MINUTES`, `HOURS`, `DAYS`, `WEEKS` |
+
+### STAReminder.js — Dispatch email
+| Funzione | Descrizione |
+|---|---|
+| `staDispatchReminder(reminder, logFn?)` | Smista il reminder al canale corretto (`gmail` default) |
+| `staSendGmailReminder(config, reminderId, logFn?)` | Invia email via GmailApp con supporto allegato Drive |
+
+### STATriggers.js — Gestione trigger GAS
+| Funzione | Descrizione |
+|---|---|
+| `staRemoveTriggersByName(fnName)` | Rimuove tutti i trigger GAS con il nome handler indicato; ritorna count |
+| `staInstallHourlyTrigger(opts)` | Installa trigger orario: `opts.fnName`, `opts.projectName`, `opts.hours` (default 1) |
+| `staInstallMinutesTrigger(opts)` | Installa trigger a minuti: `opts.fnName`, `opts.projectName`, `opts.minutes` (default 15; valori GAS: 1,5,10,15,30) |
+| `staInstallWeeklyTrigger(opts)` | Installa trigger settimanale: `opts.fnName`, `opts.projectName`, `opts.weekDay` (default MONDAY), `opts.hour` (default 8) |
+| `staRemoveProjectTriggers(fnNames, cfg, projectName)` | Rimuove trigger GAS e deregistra da Supabase per uno o più handler |
+| `staListProjectTriggers()` | Logga i trigger GAS attualmente installati nel progetto corrente |
 
 ---
 
@@ -81,20 +107,20 @@ Prima del primo deploy, eseguire `ddl_triggers.sql` nel SQL Editor di Supabase.
 
 ### 2. All'installazione del trigger
 
-Dopo `ScriptApp.newTrigger(...).create()`, chiamare `supRegisterTrigger()`:
+Usare le funzioni `sta*` di `STATriggers.js` — gestiscono automaticamente la creazione GAS e la registrazione Supabase:
 
 ```javascript
-var cfg = supGetConfig(); // o getSupabaseConfig_() se si usa Supabase.js locale
-supRegisterTrigger(cfg, {
-  triggerName:   'nomeHandlerFunction',   // es. 'runReminders'
-  projectName:   'NOME_PROGETTO_GAS',     // es. 'SUP_Reminder'
-  triggerType:   'time_based',
-  intervalValue: 15,                      // valore numerico: 1, 5, 10, 15, 30, 60, ...
-  intervalUnit:  'minutes',               // 'minutes' | 'hours' | 'days' | 'weeks'
-});
+// Trigger orario
+staInstallHourlyTrigger({ fnName: 'runReminders', projectName: 'SUP_Reminder', hours: 1 });
+
+// Trigger a minuti
+staInstallMinutesTrigger({ fnName: 'runReminders', projectName: 'SUP_Reminder', minutes: 15 });
+
+// Trigger settimanale (lunedì alle 8)
+staInstallWeeklyTrigger({ fnName: 'checkDocsWithSuggestions', projectName: 'SUP_ISO_DocsWithSuggestions' });
 ```
 
-L'operazione è un UPSERT: rieseguire `installCronTrigger()` non crea duplicati.
+Le operazioni sono idempotenti (UPSERT): rieseguire `installCronTrigger()` non crea duplicati.
 
 ### 3. Ad ogni esecuzione del trigger
 
@@ -103,7 +129,6 @@ L'operazione è un UPSERT: rieseguire `installCronTrigger()` non crea duplicati.
 ```javascript
 function nomeHandlerFunction() {
   var cfg = supGetConfig();
-  // ...
   try {
     supUpdateTriggerLastRun(cfg, 'nomeHandlerFunction', 'NOME_PROGETTO_GAS');
     // ... resto della logica
@@ -118,10 +143,8 @@ consentendo il monitoraggio dei trigger "silenziosi".
 
 ### 4. Alla rimozione del trigger
 
-Dopo `ScriptApp.deleteTrigger(...)`, chiamare `supUnregisterTrigger()`:
-
 ```javascript
-supUnregisterTrigger(cfg, 'nomeHandlerFunction', 'NOME_PROGETTO_GAS');
+staRemoveProjectTriggers('nomeHandlerFunction', supGetConfig(), 'NOME_PROGETTO_GAS');
 ```
 
 ### Riferimento: progetto SUP_Reminder
@@ -268,7 +291,7 @@ Le Script Properties vengono impostate automaticamente tramite `secrets.gs` (ved
 
 ```bash
 SCRIPT_ID=<ID_SCRIPT_GAS>
-COPY_FILES=Supabase.js
+COPY_FILES=STASupabase.js,STAReminder.js,STATriggers.js
 
 # Formato 1 — riferimento a global.env (per valori segreti):
 #   NOME_PROPERTY=NOME_VARIABILE_IN_GLOBAL_ENV
