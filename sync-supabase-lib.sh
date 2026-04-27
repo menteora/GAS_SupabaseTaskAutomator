@@ -225,11 +225,11 @@ fn_generate_secrets() {
       echo "//  secrets.gs — GENERATO AUTOMATICAMENTE da sync-supabase-lib.sh"
       echo "//  NON modificare manualmente. NON committare (vedi .gitignore)."
       echo "//"
-      echo "//  Eseguire initScriptProperties_() UNA SOLA VOLTA dall'editor GAS"
+      echo "//  Eseguire initScriptProperties() UNA SOLA VOLTA dall'editor GAS"
       echo "//  dopo ogni sync per impostare le Script Properties."
       echo "// ============================================================================="
       echo ""
-      echo "function initScriptProperties_() {"
+      echo "function initScriptProperties() {"
       echo "  PropertiesService.getScriptProperties().setProperties({"
       local p
       for p in "${props[@]}"; do
@@ -261,7 +261,7 @@ fn_generate_secrets() {
   echo ""
   echo "─────────────────────────────────────────────"
   echo " secrets.gs generati. Aprire l'editor GAS di"
-  echo " ogni progetto ed eseguire initScriptProperties_()"
+  echo " ogni progetto ed eseguire initScriptProperties()"
   echo "─────────────────────────────────────────────"
 }
 

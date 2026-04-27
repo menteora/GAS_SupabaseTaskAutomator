@@ -314,7 +314,7 @@ Se il valore non corrisponde a nessuna variabile definita in `global.env`, viene
 1. Copiare `secrets/global.env.example` → `secrets/global.env` e compilare i valori reali
 2. Lanciare `./sync-supabase-lib.sh` → opzione **6** (Pull totale) per clonare tutti i progetti
 3. Lanciare opzione **4** per generare i `secrets.gs` in ogni progetto
-4. Aprire l'editor GAS di ogni progetto ed eseguire `initScriptProperties_()` una sola volta
+4. Aprire l'editor GAS di ogni progetto ed eseguire `initScriptProperties()` una sola volta
 
 ### Sicurezza
 
