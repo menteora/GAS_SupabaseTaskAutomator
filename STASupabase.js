@@ -383,7 +383,7 @@ function supGetRegisteredTriggers(cfg, projectName) {
  */
 function supSetupVerify() {
   var cfg = supGetConfig();
-  var tables = [SUP_TABLE_REMINDERS, SUP_TABLE_LOGS, SUP_TABLE_TRIGGERS];
+  var tables = [SUP_TABLE_LOGS, SUP_TABLE_TRIGGERS];
 
   tables.forEach(function(table) {
     var res = UrlFetchApp.fetch(
