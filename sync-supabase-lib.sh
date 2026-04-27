@@ -130,12 +130,15 @@ fn_copy_files() {
       fi
     done
 
-    if [[ "$mode" == "push" && $project_changed -gt 0 ]]; then
+    if [[ "$mode" == "push" ]]; then
       if [[ -f "$project_dir/.clasp.json" ]]; then
-        echo "          → clasp push ($project)..."
-        (cd "$project_dir" && clasp push --force 2>&1 | sed 's/^/             /')
+        echo ""
+        echo "  ── clasp push: $project ──────────────────"
+        (cd "$project_dir" && clasp push --force 2>&1 | sed 's/^/  /')
+        echo "  ── fine push: $project ───────────────────"
+        echo ""
       else
-        echo "          → clasp push saltato: .clasp.json non trovato"
+        echo "  [SKIP push]  $project — .clasp.json non trovato"
       fi
     fi
   done < <(fn_list_project_envs)

@@ -1,22 +1,20 @@
 // ============================================================
-//  GAS_SupabaseTaskAutomator — Supabase.js
+//  GAS_SupabaseTaskAutomator — STASupabase.js
 //
 //  Libreria condivisa per l'interfacciamento con Supabase.
-//  Espone funzioni per: reminders, log, triggers.
+//  Espone funzioni per: log, triggers.
 //
 //  Script Properties richieste (nel progetto che usa la lib):
 //    SUPABASE_URL              → Project URL (es. https://xxxx.supabase.co)
 //    SUPABASE_SERVICE_ROLE_KEY → service_role secret key
 //
 //  Tabelle Supabase gestite:
-//    reminders        → reminder in attesa di invio
-//    logs             → log di esecuzione (batch insert)
+//    logs     → log di esecuzione (batch insert)
 //    triggers → registro dei trigger GAS attivi
 // ============================================================
 
-var SUP_TABLE_REMINDERS = 'reminders';
-var SUP_TABLE_LOGS      = 'logs';
-var SUP_TABLE_TRIGGERS  = 'triggers';
+var SUP_TABLE_LOGS     = 'logs';
+var SUP_TABLE_TRIGGERS = 'triggers';
 
 // ============================================================
 //  CONNESSIONE
@@ -74,129 +72,6 @@ function supAssertOk(res, context) {
   if (code < 200 || code >= 300) {
     throw new Error(
       '[' + context + '] Supabase HTTP ' + code + ': ' + res.getContentText()
-    );
-  }
-}
-
-// ============================================================
-//  REMINDERS
-// ============================================================
-
-/**
- * Inserisce un reminder nella tabella reminders.
- * scheduled_at è impostato a now() salvo override.
- *
- * @param {{url: string, key: string}} cfg
- * @param {string}      htmlBody      Corpo HTML dell'email
- * @param {string}      recipient     Indirizzo destinatario
- * @param {string}      subject       Oggetto dell'email
- * @param {string}      [notes]       Note libere opzionali
- * @param {string}      [scheduledAt] ISO 8601; default = now()
- * @param {string}      [cc]          Indirizzo/i CC opzionale
- * @param {string}      [bcc]         Indirizzo/i CCN opzionale
- * @returns {string|null}  UUID del reminder inserito, o null se non disponibile
- * @throws {Error} se Supabase risponde con HTTP non-2xx
- */
-function supInsertReminder(cfg, htmlBody, recipient, subject, notes, scheduledAt, cc, bcc) {
-  var channelConfig = {
-    to:      recipient,
-    subject: subject,
-    body:    htmlBody,
-    is_html: true,
-  };
-  if (cc)  channelConfig.cc  = cc;
-  if (bcc) channelConfig.bcc = bcc;
-
-  var payload = {
-    scheduled_at: scheduledAt || new Date().toISOString(),
-    channel:      'gmail',
-    channel_config: channelConfig,
-    notes: notes || null,
-  };
-
-  var res = UrlFetchApp.fetch(cfg.url + '/rest/v1/' + SUP_TABLE_REMINDERS, {
-    method:             'post',
-    headers:            supHeaders(cfg),
-    payload:            JSON.stringify(payload),
-    muteHttpExceptions: true,
-  });
-
-  supAssertOk(res, 'supInsertReminder');
-
-  var inserted   = JSON.parse(res.getContentText());
-  var reminderId = Array.isArray(inserted) && inserted[0] ? inserted[0].id : null;
-  return reminderId;
-}
-
-/**
- * Recupera i reminder con status='pending' e scheduled_at <= adesso.
- *
- * @param {{url: string, key: string}} cfg
- * @returns {Array<Object>}
- */
-function supFetchPendingReminders(cfg) {
-  var nowIso = new Date().toISOString();
-
-  var url = cfg.url + '/rest/v1/' + SUP_TABLE_REMINDERS
-    + '?scheduled_at=lte.' + encodeURIComponent(nowIso)
-    + '&status=eq.pending'
-    + '&select=id,channel,channel_config,notes'
-    + '&order=scheduled_at.asc';
-
-  var res = UrlFetchApp.fetch(url, {
-    method:             'get',
-    headers:            supHeaders(cfg),
-    muteHttpExceptions: true,
-  });
-
-  supAssertOk(res, 'supFetchPendingReminders');
-  return JSON.parse(res.getContentText());
-}
-
-/**
- * Imposta status='sent' e registra sent_at.
- *
- * @param {{url: string, key: string}} cfg
- * @param {string} id  UUID della riga
- */
-function supMarkReminderSent(cfg, id) {
-  var url = cfg.url + '/rest/v1/' + SUP_TABLE_REMINDERS
-    + '?id=eq.' + encodeURIComponent(id);
-
-  var res = UrlFetchApp.fetch(url, {
-    method:             'patch',
-    headers:            supHeaders(cfg),
-    payload:            JSON.stringify({ status: 'sent', sent_at: new Date().toISOString() }),
-    muteHttpExceptions: true,
-  });
-
-  supAssertOk(res, 'supMarkReminderSent id=' + id);
-}
-
-/**
- * Imposta status='error' e salva il messaggio in error_log (max 1000 car.).
- * Non lancia eccezioni: siamo già in contesto di gestione errori.
- *
- * @param {{url: string, key: string}} cfg
- * @param {string} id      UUID della riga
- * @param {string} errMsg  Testo dell'errore
- */
-function supMarkReminderError(cfg, id, errMsg) {
-  var url = cfg.url + '/rest/v1/' + SUP_TABLE_REMINDERS
-    + '?id=eq.' + encodeURIComponent(id);
-
-  var res = UrlFetchApp.fetch(url, {
-    method:             'patch',
-    headers:            supHeaders(cfg),
-    payload:            JSON.stringify({ status: 'error', error_log: String(errMsg).substring(0, 1000) }),
-    muteHttpExceptions: true,
-  });
-
-  var code = res.getResponseCode();
-  if (code < 200 || code >= 300) {
-    Logger.log(
-      'ATTENZIONE: supMarkReminderError PATCH fallita per id=' + id +
-      ' — HTTP ' + code + ': ' + res.getContentText()
     );
   }
 }

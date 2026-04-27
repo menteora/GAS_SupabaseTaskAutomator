@@ -45,10 +45,6 @@ Le funzioni in `STAReminder.js` e `STATriggers.js` usano il prefisso `sta*`.
 | `supAssertOk(res, context)` | Lancia errore se la risposta HTTP non è 2xx |
 | `supSetupVerify()` | Verifica connettività e tabelle (eseguire manualmente) |
 
-### STASupabase.js — Reminder (tabella `reminders`)
-| Funzione | Descrizione |
-|---|---|
-| `supInsertReminder(cfg, htmlBody, recipient, subject, notes?, scheduledAt?, cc?, bcc?)` | Insert reminder (cc e bcc opzionali) |
 | `supFetchPendingReminders(cfg)` | Legge reminder pending con scheduled_at <= now() |
 | `supMarkReminderSent(cfg, id)` | Imposta status='sent' |
 | `supMarkReminderError(cfg, id, errMsg)` | Imposta status='error' |
@@ -77,11 +73,13 @@ Le funzioni in `STAReminder.js` e `STATriggers.js` usano il prefisso `sta*`.
 | `SUP_TRIGGER_TYPE` | `TIME_BASED`, `ON_EDIT`, `ON_FORM_SUBMIT`, `ON_OPEN`, `ON_CHANGE` |
 | `SUP_TRIGGER_INTERVAL_UNIT` | `MINUTES`, `HOURS`, `DAYS`, `WEEKS` |
 
-### STAReminder.js — Dispatch email
+### STAReminder.js — Invio reminder
 | Funzione | Descrizione |
 |---|---|
-| `staDispatchReminder(reminder, logFn?)` | Smista il reminder al canale corretto (`gmail` default) |
+| `staRunAndSendReminder(reminderPayload, logFn?)` | **Entry point principale**: invia subito e logga l'esito. Non tocca Supabase. |
+| `staDispatchReminder(reminder, logFn?)` | Smista al canale corretto (`gmail` \| `telegram`) — usato internamente |
 | `staSendGmailReminder(config, reminderId, logFn?)` | Invia email via GmailApp con supporto allegato Drive |
+| `staSendTelegramReminder(config, reminderId, logFn?)` | Invia messaggio via Telegram Bot API; legge token e chat_id dalle Script Properties |
 
 ### STATriggers.js — Gestione trigger GAS
 | Funzione | Descrizione |
@@ -208,7 +206,6 @@ I file DDL nella root sono la "verità corrente" — le migration sono lo storic
 
 ## Tabelle Supabase gestite
 
-### `reminders` — schema attuale: `ddl_reminders.sql` — storia: `migrations/`
 ### `logs` — schema attuale: `ddl_logs.sql` — storia: `migrations/`
 
 ### `triggers` — schema attuale: `ddl_triggers.sql` — storia: `migrations/`
@@ -258,6 +255,8 @@ le funzioni sono disponibili direttamente nel namespace globale.
 | `SUPABASE_URL` | Sì | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Sì | Service role key |
 | `LOG_LEVEL` | Auto-creata | `debug`\|`info`\|`warn`\|`error` |
+| `TELEGRAM_BOT_TOKEN` | Solo se canale `telegram` | Token del bot (es. `123456:ABC-…`) |
+| `TELEGRAM_CHAT_ID` | Solo se canale `telegram` | Chat/channel ID di default |
 
 Le Script Properties vengono impostate automaticamente tramite `secrets.gs` (vedi sezione successiva).
 
