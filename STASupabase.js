@@ -164,6 +164,7 @@ function supBufferLog(buffer, runId, configuredLevel, level, message, context) {
 /**
  * Scrive in batch tutte le righe del buffer su Supabase (tabella logs).
  * Non lancia mai eccezioni: un errore di logging non deve bloccare il flusso principale.
+ * In caso di fallimento Supabase invia un'email di fallback con i log e l'errore.
  *
  * @param {{url: string, key: string}} cfg
  * @param {Array<Object>}              rows    Array costruito da supBufferLog()
@@ -171,6 +172,8 @@ function supBufferLog(buffer, runId, configuredLevel, level, message, context) {
  */
 function supFlushLogs(cfg, rows, runner) {
   if (!rows || rows.length === 0) return;
+
+  var supabaseError = null;
 
   try {
     var payload = rows.map(function(row) {
@@ -180,21 +183,58 @@ function supFlushLogs(cfg, rows, runner) {
       });
     });
 
-    var headers = supHeaders(cfg, true); // return=minimal
-
     var res = UrlFetchApp.fetch(cfg.url + '/rest/v1/' + SUP_TABLE_LOGS, {
       method:             'post',
-      headers:            headers,
+      headers:            supHeaders(cfg, true),
       payload:            JSON.stringify(payload),
       muteHttpExceptions: true,
     });
 
     var code = res.getResponseCode();
     if (code < 200 || code >= 300) {
-      Logger.log('ATTENZIONE: supFlushLogs fallita — HTTP ' + code + ': ' + res.getContentText());
+      supabaseError = 'HTTP ' + code + ': ' + res.getContentText();
     }
   } catch (e) {
-    Logger.log('ATTENZIONE: supFlushLogs eccezione — ' + (e.message || String(e)));
+    supabaseError = e.message || String(e);
+  }
+
+  if (supabaseError) {
+    Logger.log('ATTENZIONE: supFlushLogs fallita — ' + supabaseError);
+    supSendFallbackEmail_(rows, runner, supabaseError);
+  }
+}
+
+/**
+ * Invia un'email di fallback quando Supabase non è raggiungibile.
+ * Indirizzo destinatario: utente corrente dello script (Session.getEffectiveUser()).
+ * Non lancia mai eccezioni.
+ *
+ * @param {Array<Object>} rows          Buffer di log
+ * @param {Object}        runner        Info runner
+ * @param {string}        supabaseError Messaggio di errore Supabase
+ */
+function supSendFallbackEmail_(rows, runner, supabaseError) {
+  try {
+    var recipient = Session.getEffectiveUser().getEmail();
+    if (!recipient) return;
+
+    var project   = (runner && runner.project_name) || 'GAS Script';
+    var subject   = '[' + project + '] Fallback log — Supabase non raggiungibile';
+
+    var logLines = rows.map(function(r) {
+      return '[' + r.level.toUpperCase() + '] ' + r.logged_at + ' — ' + r.message +
+        (r.context && Object.keys(r.context).length ? ' ' + JSON.stringify(r.context) : '');
+    }).join('\n');
+
+    var body =
+      'Supabase non ha accettato il log per il progetto "' + project + '".\n\n' +
+      'Errore Supabase:\n' + supabaseError + '\n\n' +
+      'Log dell\'esecuzione:\n' + logLines + '\n\n' +
+      'Runner: ' + JSON.stringify(runner || {});
+
+    GmailApp.sendEmail(recipient, subject, body);
+  } catch (e) {
+    Logger.log('ATTENZIONE: supSendFallbackEmail_ fallita — ' + (e.message || String(e)));
   }
 }
 
@@ -283,7 +323,13 @@ function supRegisterTrigger(cfg, opts) {
     }
   );
 
-  supAssertOk(res, 'supRegisterTrigger');
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    Logger.log(
+      'ATTENZIONE: supRegisterTrigger fallita — HTTP ' + code + ': ' + res.getContentText()
+    );
+    return null;
+  }
 
   var inserted = JSON.parse(res.getContentText());
   return Array.isArray(inserted) && inserted[0] ? inserted[0].id : null;
@@ -298,23 +344,27 @@ function supRegisterTrigger(cfg, opts) {
  * @param {string} projectName   Nome del progetto GAS
  */
 function supUpdateTriggerLastRun(cfg, triggerName, projectName) {
-  var url = cfg.url + '/rest/v1/' + SUP_TABLE_TRIGGERS
-    + '?trigger_name=eq.' + encodeURIComponent(triggerName)
-    + '&project_name=eq.'  + encodeURIComponent(projectName);
+  try {
+    var url = cfg.url + '/rest/v1/' + SUP_TABLE_TRIGGERS
+      + '?trigger_name=eq.' + encodeURIComponent(triggerName)
+      + '&project_name=eq.'  + encodeURIComponent(projectName);
 
-  var res = UrlFetchApp.fetch(url, {
-    method:             'patch',
-    headers:            supHeaders(cfg, true),
-    payload:            JSON.stringify({ last_run_at: new Date().toISOString() }),
-    muteHttpExceptions: true,
-  });
+    var res = UrlFetchApp.fetch(url, {
+      method:             'patch',
+      headers:            supHeaders(cfg, true),
+      payload:            JSON.stringify({ last_run_at: new Date().toISOString() }),
+      muteHttpExceptions: true,
+    });
 
-  var code = res.getResponseCode();
-  if (code < 200 || code >= 300) {
-    Logger.log(
-      'ATTENZIONE: supUpdateTriggerLastRun fallita per ' + triggerName +
-      ' — HTTP ' + code + ': ' + res.getContentText()
-    );
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      Logger.log(
+        'ATTENZIONE: supUpdateTriggerLastRun fallita per ' + triggerName +
+        ' — HTTP ' + code + ': ' + res.getContentText()
+      );
+    }
+  } catch (e) {
+    Logger.log('ATTENZIONE: supUpdateTriggerLastRun eccezione — ' + (e.message || String(e)));
   }
 }
 

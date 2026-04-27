@@ -133,6 +133,42 @@ function staInstallWeeklyTrigger(opts) {
 }
 
 /**
+ * Installa un trigger semestrale che gira il 1° gennaio e il 1° luglio.
+ * Internamente usa onMonthDay(1): la funzione handler deve controllare
+ * se il mese corrente è 0 (gennaio) o 6 (luglio) prima di eseguire.
+ * Idempotente.
+ *
+ * @param {Object} opts
+ * @param {string} opts.fnName       Nome della funzione handler GAS
+ * @param {string} opts.projectName  Nome progetto per il registro Supabase
+ * @param {number} [opts.hour=7]     Ora del giorno 0-23
+ */
+function staInstallSemestralTrigger(opts) {
+  var fnName      = opts.fnName;
+  var projectName = opts.projectName;
+  var hour        = (typeof opts.hour === 'number') ? opts.hour : 7;
+
+  staRemoveTriggersByName(fnName);
+
+  ScriptApp.newTrigger(fnName)
+    .timeBased()
+    .onMonthDay(1)
+    .atHour(hour)
+    .create();
+
+  var cfg = supGetConfig();
+  supRegisterTrigger(cfg, {
+    triggerName:   fnName,
+    projectName:   projectName,
+    triggerType:   SUP_TRIGGER_TYPE.TIME_BASED,
+    intervalValue: 6,
+    intervalUnit:  'months',
+  });
+
+  Logger.log('Trigger semestrale installato: ' + fnName + ' il 1° gen/lug alle ' + hour + ':00.');
+}
+
+/**
  * Rimuove i trigger GAS e deregistra dal registro Supabase per i
  * nomi funzione indicati.
  *

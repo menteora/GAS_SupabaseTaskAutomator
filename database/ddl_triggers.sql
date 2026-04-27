@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.triggers (
   --          interval_value=15, interval_unit='minutes' → ogni 15 min
   --          interval_value=1, interval_unit='weeks'  → ogni settimana
   interval_value INTEGER     CHECK (interval_value > 0),
-  interval_unit  TEXT        CHECK (interval_unit IN ('minutes', 'hours', 'days', 'weeks')),
+  interval_unit  TEXT        CHECK (interval_unit IN ('minutes', 'hours', 'days', 'weeks', 'months')),
 
   -- Esecuzione
   last_run_at    TIMESTAMPTZ,                     -- aggiornato ad ogni fire del trigger
