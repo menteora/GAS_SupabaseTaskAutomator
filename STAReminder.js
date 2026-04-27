@@ -199,5 +199,4 @@ function staSendTelegramReminder(config, reminderId, logFn) {
     );
   }
 
-  _log('info', 'Telegram reminder inviato.', { reminder_id: reminderId, chat_id: chatId });
 }
